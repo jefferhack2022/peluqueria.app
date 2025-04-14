@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barbería autentics</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container fade-in">
+        <!-- Sección de Autenticación -->
+        <div id="authSection">
+            <h2>💈 Barbería Citas Hugo</h2>
+            <div class="input-group">
+                <input type="text" id="username" placeholder="Usuario">
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Contraseña">
+            </div>
+            <button onclick="handleAuth()">Ingresar / Registrarse</button>
+        </div>
+
+        <!-- Sección Principal de Usuario -->
+        <div id="mainSection" class="hidden">
+            <h2>Bienvenido, <span id="userWelcome"></span></h2>
+            <h3>📅 Agendar Cita</h3>
+            <div class="input-group">
+                <select id="service">
+                    <option value="corte">Corte de Cabello - $15000</option>
+                    <option value="barba">Corte de Barba - $5000</option>
+                    <option value="ambos">Corte de Cabello mas Barba - $18000</option>
+                    <option value="Cejas">Cejas - $2000</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <input type="date" id="date">
+            </div>
+            <div class="input-group">
+                <label>Horarios Disponibles:</label>
+                <div id="timeSlots" class="time-slots"></div>
+            </div>
+            <div class="input-group">
+                <label for="payment">Comprobante de Pago:</label>
+                <input type="file" id="payment" accept="image/*" onchange="previewImage(event)">
+                <img id="preview" class="preview-image hidden">
+            </div>
+            <button onclick="makeAppointment()">Agendar Cita</button>
+            
+            <div id="appointmentsList">
+                <h3>📋 Mis Citas</h3>
+            </div>
+            
+            <button onclick="logout()" class="logout-btn">Cerrar Sesión</button>
+        </div>
+
+        <!-- Panel de Administrador -->
+        <div id="adminSection" class="hidden">
+            <h2>Panel de Administrador</h2>
+            
+            <!-- Gestión de Días -->
+            <div class="admin-card">
+                <h3>🗓️ Gestión de Días</h3>
+                <div class="input-group">
+                    <label>Bloquear/Desbloquear Día:</label>
+                    <input type="date" id="adminDate">
+                    <button onclick="toggleBlockedDay()" class="admin-btn">Alternar Disponibilidad</button>
+                </div>
+                <div id="blockedDaysList" class="blocked-list">
+                    <h4>Días Bloqueados:</h4>
+                </div>
+            </div>
+
+            <!-- Gestión de Horarios -->
+            <div class="admin-card">
+                <h3>⏰ Gestión de Horarios</h3>
+                <div class="input-group">
+                    <label>Seleccionar Día:</label>
+                    <input type="date" id="adminTimeDate">
+                </div>
+                <div id="adminTimeSlots" class="time-slots admin-slots"></div>
+            </div>
+
+            <!-- Lista de Todas las Citas -->
+            <div class="admin-card">
+                <h3>📋 Todas las Citas</h3>
+                <div id="allAppointmentsList"></div>
+            </div>
+
+            <button onclick="logout()" class="logout-btn">Cerrar Sesión</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+        import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+        import { getStorage } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyARfR8QwkP7RuOtkDIxT2Qw-AJ81twsbbU",
+            authDomain: "barberia-app-c6a5a.firebaseapp.com",
+            projectId: "barberia-app-c6a5a",
+            storageBucket: "barberia-app-c6a5a.firebastorage.app",
+            messagingSenderId: "411388410380",
+            appId: "1:411388410380:web:34216bf3231c4ff5638c29"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        // Make Firebase services available globally
+        window.auth = auth;
+        window.db = db;
+        window.storage = storage;
+    </script>
+
+    <!-- Scripts -->
+    <script type="module" src="js/auth.js"></script>
+    <script type="module" src="js/admin.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
