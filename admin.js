@@ -1,66 +1,143 @@
 // Variables globales para el admin
-let blockedDays = JSON.parse(localStorage.getItem('blockedDays')) || [];
-let blockedTimes = JSON.parse(localStorage.getItem('blockedTimes')) || {};
+let blockedDays = [];
 
-// Inicialización de localStorage para el admin
-if (!localStorage.getItem('blockedDays')) {
-    localStorage.setItem('blockedDays', '[]');
-}
-if (!localStorage.getItem('blockedTimes')) {
-    localStorage.setItem('blockedTimes', '{}');
-}
-
-// Cargar panel de administrador
 function loadAdminPanel() {
-    showBlockedDays();
-    loadAdminTimeSlots();
-    showAllAppointments();
+    Promise.all([
+        showAllAppointments(),
+        loadBlockedDays(),
+        loadAdminTimeSlots()
+    ]).catch(error => {
+        console.error("Error loading admin panel:", error);
+        alert('Error al cargar el panel de administrador');
+    });
 }
 
-// Gestión de días bloqueados
+function showAllAppointments() {
+    const appointmentsList = document.getElementById('allAppointmentsList');
+    appointmentsList.innerHTML = '<h3>📋 Todas las Citas</h3>';
+
+    return firebase.firestore().collection('appointments')
+        .orderBy('date', 'asc')
+        .get()
+        .then((querySnapshot) => {
+            if (querySnapshot.empty) {
+                appointmentsList.innerHTML += '<p>No hay citas programadas</p>';
+                return;
+            }
+
+            querySnapshot.forEach((doc) => {
+                const appointment = doc.data();
+                appointmentsList.innerHTML += `
+                    <div class="appointment-card">
+                        <p><strong>Cliente:</strong> ${appointment.username}</p>
+                        <p><strong>Servicio:</strong> ${appointment.service}</p>
+                        <p><strong>Fecha:</strong> ${appointment.date}</p>
+                        <p><strong>Hora:</strong> ${appointment.time}</p>
+                        <img src="${appointment.paymentProofUrl}" class="preview-image" alt="Comprobante">
+                        <button onclick="deleteAppointment('${doc.id}')" class="delete-btn">
+                            Cancelar Cita
+                        </button>
+                    </div>
+                `;
+            });
+        });
+}
+
+function deleteAppointment(appointmentId) {
+    if (!confirm('¿Estás seguro de que deseas cancelar esta cita?')) {
+        return;
+    }
+
+    firebase.firestore().collection('appointments').doc(appointmentId).delete()
+        .then(() => {
+            alert('Cita cancelada exitosamente');
+            showAllAppointments();
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al cancelar la cita');
+        });
+}
+
 function toggleBlockedDay() {
     const date = document.getElementById('adminDate').value;
-    if(!date) {
+    if (!date) {
         alert('Por favor selecciona una fecha');
         return;
     }
 
-    const index = blockedDays.indexOf(date);
-    if(index === -1) {
-        blockedDays.push(date);
-    } else {
-        blockedDays.splice(index, 1);
-    }
+    const blockedDaysRef = firebase.firestore().collection('blockedDays').doc('days');
+    
+    blockedDaysRef.get()
+        .then((doc) => {
+            let blockedDays = doc.exists ? doc.data().days : [];
+            
+            if (blockedDays.includes(date)) {
+                blockedDays = blockedDays.filter(d => d !== date);
+            } else {
+                blockedDays.push(date);
+            }
 
-    localStorage.setItem('blockedDays', JSON.stringify(blockedDays));
-    showBlockedDays();
+            return blockedDaysRef.set({ days: blockedDays });
+        })
+        .then(() => {
+            loadBlockedDays();
+            alert('Día actualizado exitosamente');
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al actualizar el día');
+        });
 }
 
-function showBlockedDays() {
-    const list = document.getElementById('blockedDaysList');
-    list.innerHTML = '<h4>Días Bloqueados:</h4>';
+function loadBlockedDays() {
+    return firebase.firestore().collection('blockedDays').doc('days').get()
+        .then((doc) => {
+            blockedDays = doc.exists ? doc.data().days : [];
+            
+            const list = document.getElementById('blockedDaysList');
+            list.innerHTML = '<h4>Días Bloqueados:</h4>';
 
-    blockedDays.forEach(day => {
-        const dayElement = document.createElement('div');
-        dayElement.className = 'blocked-day';
-        dayElement.innerHTML = `
-            <span>${day}</span>
-            <button onclick="removeBlockedDay('${day}')" class="delete-btn">Eliminar</button>
-        `;
-        list.appendChild(dayElement);
-    });
+            if (blockedDays.length === 0) {
+                list.innerHTML += '<p>No hay días bloqueados</p>';
+                return;
+            }
+
+            blockedDays.forEach(day => {
+                list.innerHTML += `
+                    <div class="blocked-day">
+                        <span>${day}</span>
+                        <button onclick="removeBlockedDay('${day}')" class="delete-btn">
+                            Eliminar
+                        </button>
+                    </div>
+                `;
+            });
+        });
 }
 
 function removeBlockedDay(day) {
-    blockedDays = blockedDays.filter(d => d !== day);
-    localStorage.setItem('blockedDays', JSON.stringify(blockedDays));
-    showBlockedDays();
+    const blockedDaysRef = firebase.firestore().collection('blockedDays').doc('days');
+    
+    blockedDaysRef.get()
+        .then((doc) => {
+            let blockedDays = doc.exists ? doc.data().days : [];
+            blockedDays = blockedDays.filter(d => d !== day);
+            return blockedDaysRef.set({ days: blockedDays });
+        })
+        .then(() => {
+            loadBlockedDays();
+            alert('Día desbloqueado exitosamente');
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al desbloquear el día');
+        });
 }
 
-// Gestión de horarios del admin
 function loadAdminTimeSlots() {
     const date = document.getElementById('adminTimeDate').value;
-    if(!date) return;
+    if (!date) return;
 
     const timeSlotsDiv = document.getElementById('adminTimeSlots');
     timeSlotsDiv.innerHTML = '';
@@ -71,75 +148,55 @@ function loadAdminTimeSlots() {
         '18:00', '18:30'
     ];
 
-    timeSlots.forEach(time => {
-        const slot = document.createElement('div');
-        slot.className = 'time-slot';
-        slot.textContent = time;
+    firebase.firestore().collection('blockedTimes').doc(date).get()
+        .then((doc) => {
+            const blockedTimes = doc.exists ? doc.data().times : [];
 
-        const isBlocked = blockedTimes[date]?.includes(time);
-        if(isBlocked) {
-            slot.classList.add('blocked');
-        } else {
-            slot.classList.add('available');
-        }
+            timeSlots.forEach(time => {
+                const slot = document.createElement('div');
+                slot.className = 'time-slot';
+                slot.textContent = time;
 
-        slot.onclick = () => toggleTimeSlot(date, time, slot);
-        timeSlotsDiv.appendChild(slot);
-    });
+                if (blockedTimes.includes(time)) {
+                    slot.classList.add('blocked');
+                } else {
+                    slot.classList.add('available');
+                }
+
+                slot.onclick = () => toggleTimeSlot(date, time, slot);
+                timeSlotsDiv.appendChild(slot);
+            });
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al cargar los horarios');
+        });
 }
 
 function toggleTimeSlot(date, time, element) {
-    if(!blockedTimes[date]) {
-        blockedTimes[date] = [];
-    }
+    const blockedTimesRef = firebase.firestore().collection('blockedTimes').doc(date);
+    
+    blockedTimesRef.get()
+        .then((doc) => {
+            let blockedTimes = doc.exists ? doc.data().times : [];
+            
+            if (blockedTimes.includes(time)) {
+                blockedTimes = blockedTimes.filter(t => t !== time);
+                element.classList.remove('blocked');
+                element.classList.add('available');
+            } else {
+                blockedTimes.push(time);
+                element.classList.remove('available');
+                element.classList.add('blocked');
+            }
 
-    const index = blockedTimes[date].indexOf(time);
-    if(index === -1) {
-        blockedTimes[date].push(time);
-        element.classList.remove('available');
-        element.classList.add('blocked');
-    } else {
-        blockedTimes[date].splice(index, 1);
-        element.classList.remove('blocked');
-        element.classList.add('available');
-    }
-
-    localStorage.setItem('blockedTimes', JSON.stringify(blockedTimes));
+            return blockedTimesRef.set({ times: blockedTimes });
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al actualizar el horario');
+        });
 }
 
-// Gestión de todas las citas
-function showAllAppointments() {
-    const appointments = JSON.parse(localStorage.getItem('appointmentsArray')) || [];
-    const list = document.getElementById('allAppointmentsList');
-    list.innerHTML = '';
-
-    appointments.forEach(app => {
-        const card = document.createElement('div');
-        card.className = 'appointment-card';
-        card.innerHTML = `
-            <p><strong>Cliente:</strong> ${app.username}</p>
-            <p><strong>Servicio:</strong> ${app.service}</p>
-            <p><strong>Fecha:</strong> ${app.date}</p>
-            <p><strong>Hora:</strong> ${app.time}</p>
-            <img src="${app.paymentProof}" class="preview-image" alt="Comprobante">
-            <button onclick="deleteAppointment('${app.date}', '${app.time}')" class="delete-btn">
-                Cancelar Cita
-            </button>
-        `;
-        list.appendChild(card);
-    });
-}
-
-function deleteAppointment(date, time) {
-    if(confirm('¿Estás seguro de que deseas cancelar esta cita?')) {
-        let appointments = JSON.parse(localStorage.getItem('appointmentsArray')) || [];
-        appointments = appointments.filter(app => 
-            !(app.date === date && app.time === time)
-        );
-        localStorage.setItem('appointmentsArray', JSON.stringify(appointments));
-        showAllAppointments();
-    }
-}
-
-// Event Listener para el cambio de fecha en el admin
-document.getElementById('adminTimeDate').addEventListener('change', loadAdminTimeSlots);
+// Event Listeners
+document.getElementById('adminTimeDate')?.addEventListener('change', loadAdminTimeSlots);
