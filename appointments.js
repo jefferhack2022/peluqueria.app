@@ -1,37 +1,72 @@
-// Manejo de citas
-const appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+function showAppointments() {
+    const username = sessionStorage.getItem('currentUser');
+    
+    firebase.firestore().collection('appointments')
+        .where('username', '==', username)
+        .orderBy('date', 'asc')
+        .get()
+        .then((querySnapshot) => {
+            const appointmentsList = document.getElementById('appointmentsList');
+            appointmentsList.innerHTML = '<h3>📋 Mis Citas</h3>';
 
-function createAppointment(data) {
-    const appointment = {
-        id: Date.now(),
-        service: data.service,
-        date: data.date,
-        time: data.time,
-        clientName: data.fullName,
-        paymentProof: data.paymentProof,
-        userId: JSON.parse(localStorage.getItem('currentUser')).name
-    };
+            if (querySnapshot.empty) {
+                appointmentsList.innerHTML += '<p>No tienes citas agendadas</p>';
+                return;
+            }
 
-    appointments.push(appointment);
-    localStorage.setItem('appointments', JSON.stringify(appointments));
-    return true;
+            querySnapshot.forEach((doc) => {
+                const appointment = doc.data();
+                appointmentsList.innerHTML += `
+                    <div class="appointment-card">
+                        <p><strong>Servicio:</strong> ${appointment.service}</p>
+                        <p><strong>Fecha:</strong> ${appointment.date}</p>
+                        <p><strong>Hora:</strong> ${appointment.time}</p>
+                        <img src="${appointment.paymentProofUrl}" class="preview-image" alt="Comprobante">
+                    </div>
+                `;
+            });
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al cargar las citas');
+        });
 }
 
-function getAvailableHours(date) {
-    const hours = [];
-    const bookedHours = appointments
-        .filter(app => app.date === date)
-        .map(app => app.time);
+function makeAppointment() {
+    const service = document.getElementById('service').value;
+    const date = document.getElementById('date').value;
+    const paymentFile = document.getElementById('payment').files[0];
 
-    for (let i = 8; i <= 20; i++) {
-        if (i !== 12) { // Excluir hora de almuerzo
-            const hour = `${i}:00`;
-            const halfHour = `${i}:30`;
-            
-            if (!bookedHours.includes(hour)) hours.push(hour);
-            if (!bookedHours.includes(halfHour)) hours.push(halfHour);
-        }
+    if(!date || !selectedTime || !paymentFile) {
+        alert('Por favor completa todos los campos y sube el comprobante de pago');
+        return;
     }
 
-    return hours;
+    const storageRef = firebase.storage().ref(`comprobantes/${firebase.auth().currentUser.uid}/${Date.now()}_${paymentFile.name}`);
+    
+    storageRef.put(paymentFile)
+        .then(snapshot => snapshot.ref.getDownloadURL())
+        .then(downloadURL => {
+            return firebase.firestore().collection('appointments').add({
+                userId: firebase.auth().currentUser.uid,
+                username: sessionStorage.getItem('currentUser'),
+                service: service,
+                date: date,
+                time: selectedTime,
+                paymentProofUrl: downloadURL,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        })
+        .then(() => {
+            alert('Cita agendada con éxito');
+            document.getElementById('payment').value = '';
+            document.getElementById('preview').classList.add('hidden');
+            selectedTime = null;
+            showAppointments();
+            loadTimeSlots(date);
+        })
+        .catch((error) => {
+            console.error("Error:", error);
+            alert('Error al agendar la cita');
+        });
 }
