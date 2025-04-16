@@ -10,7 +10,7 @@
     <div class="container fade-in">
         <!-- Sección de Autenticación -->
         <div id="authSection">
-            <h2>💈 Barbería Citas Hugo</h2>
+            <h2>💈 Barbería Citas Andres Mera</h2>
             <div class="input-group">
                 <input type="text" id="username" placeholder="Usuario">
             </div>
@@ -91,16 +91,15 @@
     </div>
 
     <!-- Firebase SDK -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-        import { getAuth } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-        import { getStorage } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js";
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
 
-        // Your web app's Firebase configuration
+    <script>
+        // Configuración de Firebase
         const firebaseConfig = {
-            apiKey: "AIzaSyARfR8QwkP7RuOtkDIxT2Qw-AJ81twsbbU",
+            apiKey: "AIzaSyARfR8QwkP7RuOtkDIxT2Qw-AJ8ltwsbbU",
             authDomain: "barberia-app-c6a5a.firebaseapp.com",
             projectId: "barberia-app-c6a5a",
             storageBucket: "barberia-app-c6a5a.firebastorage.app",
@@ -108,21 +107,24 @@
             appId: "1:411388410380:web:34216bf3231c4ff5638c29"
         };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const storage = getStorage(app);
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
 
-        // Make Firebase services available globally
-        window.auth = auth;
-        window.db = db;
-        window.storage = storage;
+           // Verificar inicialización
+    firebase.auth().onAuthStateChanged(function(user) {
+        console.log('Estado de autenticación:', user ? 'Usuario logueado' : 'No hay usuario');
+    });
+
+        // Referencias globales
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
     </script>
 
     <!-- Scripts -->
-    <script type="module" src="js/auth.js"></script>
-    <script type="module" src="js/admin.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/appointments.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
