@@ -1,9 +1,4 @@
-// Inicialización de localStorage
-if (!localStorage.getItem('usersArray')) {
-    localStorage.setItem('usersArray', '[]');
-}
-
-// Función de autenticación principal
+// auth.js
 function handleAuth() {
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
@@ -13,66 +8,149 @@ function handleAuth() {
         return;
     }
 
-    // Verificar si es admin
-    if(username === 'admin' && password === 'admin123') {
-        loginAdmin();
+    // Asegúrate de que el email tenga el formato correcto
+    const email = `${username.toLowerCase()}@barberia-app.com`;
+
+    console.log('Intentando autenticar:', email); // Log para debugging
+
+    if(username.toLowerCase() === 'admin' && password === 'admin123') {
+        console.log('Intentando login como admin');
+        
+        firebase.auth().signInWithEmailAndPassword(email, password)
+            .then((userCredential) => {
+                console.log('Admin login exitoso:', userCredential.user.uid);
+                return firebase.firestore().collection('users').doc(userCredential.user.uid).set({
+                    username: 'admin',
+                    role: 'admin',
+                    email: email
+                }, { merge: true });
+            })
+            .then(() => {
+                loginAdmin();
+            })
+            .catch((error) => {
+                console.log('Error en login admin:', error.code);
+                
+                if(error.code === 'auth/user-not-found') {
+                    console.log('Creando cuenta de admin');
+                    
+                    return firebase.auth().createUserWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            console.log('Admin creado:', userCredential.user.uid);
+                            return firebase.firestore().collection('users').doc(userCredential.user.uid).set({
+                                username: 'admin',
+                                role: 'admin',
+                                email: email,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        })
+                        .then(() => {
+                            loginAdmin();
+                        });
+                }
+                console.error('Error en autenticación admin:', error);
+                alert(error.message);
+            });
         return;
     }
 
-    let usersArray = JSON.parse(localStorage.getItem('usersArray'));
-    let userFound = false;
-    let isValidUser = false;
+    console.log('Intentando login como usuario normal');
 
-    for(let i = 0; i < usersArray.length; i++) {
-        if(usersArray[i].username === username) {
-            userFound = true;
-            if(usersArray[i].password === password) {
-                isValidUser = true;
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            console.log('Usuario login exitoso:', userCredential.user.uid);
+            return firebase.firestore().collection('users').doc(userCredential.user.uid).set({
+                username: username,
+                role: 'user',
+                email: email
+            }, { merge: true });
+        })
+        .then(() => {
+            loginUser(username);
+        })
+        .catch((error) => {
+            console.log('Error en login usuario:', error.code);
+            
+            if(error.code === 'auth/user-not-found') {
+                console.log('Creando nueva cuenta de usuario');
+                
+                return firebase.auth().createUserWithEmailAndPassword(email, password)
+                    .then((userCredential) => {
+                        console.log('Usuario creado:', userCredential.user.uid);
+                        return firebase.firestore().collection('users').doc(userCredential.user.uid).set({
+                            username: username,
+                            role: 'user',
+                            email: email,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    })
+                    .then(() => {
+                        loginUser(username);
+                    });
             }
-            break;
-        }
-    }
-
-    if(userFound && !isValidUser) {
-        alert('Contraseña incorrecta');
-        return;
-    }
-
-    if(!userFound) {
-        usersArray.push({
-            username: username,
-            password: password
+            console.error('Error en autenticación usuario:', error);
+            alert(error.message);
         });
-        localStorage.setItem('usersArray', JSON.stringify(usersArray));
-        alert('Usuario registrado exitosamente');
-    }
-
-    loginUser(username);
 }
 
-// Login de usuario normal
 function loginUser(username) {
-    localStorage.setItem('currentUser', username);
+    console.log('Login usuario:', username);
+    sessionStorage.setItem('currentUser', username);
     document.getElementById('authSection').classList.add('hidden');
     document.getElementById('mainSection').classList.remove('hidden');
     document.getElementById('userWelcome').textContent = username;
     showAppointments();
 }
 
-// Login de administrador
 function loginAdmin() {
-    localStorage.setItem('currentUser', 'admin');
+    console.log('Login admin');
+    sessionStorage.setItem('currentUser', 'admin');
     document.getElementById('authSection').classList.add('hidden');
     document.getElementById('adminSection').classList.remove('hidden');
     loadAdminPanel();
 }
 
-// Función de cierre de sesión
 function logout() {
-    localStorage.removeItem('currentUser');
-    document.getElementById('mainSection').classList.add('hidden');
-    document.getElementById('adminSection').classList.add('hidden');
-    document.getElementById('authSection').classList.remove('hidden');
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
+    console.log('Cerrando sesión');
+    firebase.auth().signOut()
+        .then(() => {
+            console.log('Sesión cerrada exitosamente');
+            sessionStorage.removeItem('currentUser');
+            document.getElementById('mainSection').classList.add('hidden');
+            document.getElementById('adminSection').classList.add('hidden');
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        })
+        .catch((error) => {
+            console.error('Error en logout:', error);
+            alert('Error al cerrar sesión: ' + error.message);
+        });
 }
+
+// Verificar estado de autenticación
+firebase.auth().onAuthStateChanged((user) => {
+    if (user) {
+        console.log('Usuario autenticado:', user.uid);
+        firebase.firestore().collection('users').doc(user.uid).get()
+            .then((doc) => {
+                if (doc.exists) {
+                    console.log('Datos de usuario:', doc.data());
+                    if (doc.data().role === 'admin') {
+                        loginAdmin();
+                    } else {
+                        loginUser(doc.data().username);
+                    }
+                } else {
+                    console.log('No se encontraron datos del usuario');
+                    logout();
+                }
+            })
+            .catch((error) => {
+                console.error('Error obteniendo datos del usuario:', error);
+                logout();
+            });
+    } else {
+        console.log('No hay usuario autenticado');
+    }
+});
